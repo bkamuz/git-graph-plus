@@ -8,6 +8,8 @@ import { samePath } from '../utils/path';
 import { readTimeoutMs, readInitialCommitCount, readLoadMoreCommitCount, readInteractiveRebaseMode } from '../utils/config';
 import { buildClassicRebaseCommand } from '../git/classic-rebase';
 import { buildFullGraph } from '../git/git-graph-builder';
+import { simplifyCommits } from '../git/commit-simplifier';
+import type { BranchInfo, Commit, CommitGraphData } from '../git/types';
 import { compileBranchColorRules, makeBranchColorResolver } from '../git/branch-color-resolver';
 import { resolveGraphColors } from '../git/graph-colors';
 import { triggerVSCodeGitAuth } from '../git/vscode-git-bridge';
@@ -29,6 +31,7 @@ export class MainPanel {
   private static readonly viewType = 'gitGraphPlus';
   private static savedRemoteFilter: string[] | undefined = undefined;
   private static savedBranchFilter: string[] | undefined = undefined;
+  private static savedSimplifyGraph = false;
   private static extraEnv: Record<string, string> | undefined = undefined;
   // Shared across panels in this extension host. The on-disk cache lives under
   // globalStorage so every VS Code window reuses the same avatars instead of
@@ -46,6 +49,10 @@ export class MainPanel {
   private currentLimit = 1000;
   private currentRemoteFilter: string[] | undefined = undefined;
   private currentBranchFilter: string[] | undefined = undefined;
+  private currentSimplifyGraph = false;
+  private lastRawCommits: Commit[] = [];
+  private lastLogBranches: BranchInfo[] = [];
+  private lastHasMore = false;
   private isFirstGetLog = true;
   private logSequence = 0;
   private searchSequence = 0;
@@ -349,6 +356,9 @@ export class MainPanel {
     this.isFirstGetLog = true;
     this.currentRemoteFilter = undefined;
     this.currentBranchFilter = undefined;
+    this.lastRawCommits = [];
+    this.lastLogBranches = [];
+    this.lastHasMore = false;
 
     const oldWatcher = this.fileWatcher;
     oldWatcher.dispose();
@@ -413,9 +423,13 @@ export class MainPanel {
           const effectiveBranchFilter = this.isFirstGetLog && message.payload.branches === undefined
             ? MainPanel.savedBranchFilter
             : message.payload.branches;
+          const effectiveSimplifyGraph = this.isFirstGetLog && message.payload.simplifyGraph === undefined
+            ? MainPanel.savedSimplifyGraph
+            : message.payload.simplifyGraph ?? this.currentSimplifyGraph;
           this.isFirstGetLog = false;
           this.currentRemoteFilter = effectiveFilter;
           this.currentBranchFilter = effectiveBranchFilter;
+          this.currentSimplifyGraph = effectiveSimplifyGraph;
           const logPayload = { ...message.payload, remoteFilter: effectiveFilter, branches: effectiveBranchFilter, limit: requestedLimit + 1, sortOrder, includeSignature };
           const seq = ++this.logSequence;
           const [allFetched, logBranches] = await Promise.all([
@@ -424,26 +438,19 @@ export class MainPanel {
           ]);
           if (seq !== this.logSequence) break;
           const hasMore = allFetched.length > requestedLimit;
-          const commits = hasMore ? allFetched.slice(0, requestedLimit) : allFetched;
-          const branchColorResolver = this.makeBranchColorResolver();
-          const fullGraph = commits.length > 0 ? buildFullGraph(commits, logBranches, branchColorResolver) : { paths: [], links: [], dots: [], commitLeftMargin: [] };
+          const rawCommits = hasMore ? allFetched.slice(0, requestedLimit) : allFetched;
+          this.lastRawCommits = rawCommits;
+          this.lastLogBranches = logBranches;
+          this.lastHasMore = hasMore;
           this.post({
             type: 'logData',
-            payload: {
-              commits,
-              hasMore,
-              currentLimit: requestedLimit,
-              // The webview renders from paths/links/dots; the legacy GraphNode[] is
-              // unused, so we skip building and sending it (saves CPU + IPC payload).
-              graph: [],
-              paths: fullGraph.paths,
-              links: fullGraph.links,
-              dots: fullGraph.dots,
-              commitLeftMargin: fullGraph.commitLeftMargin,
-              remoteFilter: effectiveFilter,
-              branches: effectiveBranchFilter,
-            },
+            payload: this.buildLogDataFromRaw(rawCommits, logBranches, hasMore, effectiveFilter, effectiveBranchFilter),
           });
+          break;
+        }
+        case 'setSimplifyGraph': {
+          this.currentSimplifyGraph = message.payload.enabled;
+          this.postCachedLogData();
           break;
         }
         case 'getBranches': {
@@ -1752,6 +1759,47 @@ export class MainPanel {
     }
   }
 
+  private buildLogDataFromRaw(
+    rawCommits: Commit[],
+    logBranches: BranchInfo[],
+    hasMore: boolean,
+    remoteFilter: string[] | undefined,
+    branchFilter: string[] | undefined,
+    simplifyGraph: boolean = this.currentSimplifyGraph,
+  ): CommitGraphData {
+    const commits = simplifyGraph ? simplifyCommits(rawCommits) : rawCommits;
+    const fullGraph = commits.length > 0
+      ? buildFullGraph(commits, logBranches, this.makeBranchColorResolver())
+      : { paths: [], links: [], dots: [], commitLeftMargin: [] };
+    return {
+      commits,
+      hasMore,
+      currentLimit: this.currentLimit,
+      graph: [],
+      paths: fullGraph.paths,
+      links: fullGraph.links,
+      dots: fullGraph.dots,
+      commitLeftMargin: fullGraph.commitLeftMargin,
+      remoteFilter,
+      branches: branchFilter,
+      simplifyGraph,
+    };
+  }
+
+  private postCachedLogData(): void {
+    if (this.lastRawCommits.length === 0) return;
+    this.post({
+      type: 'logData',
+      payload: this.buildLogDataFromRaw(
+        this.lastRawCommits,
+        this.lastLogBranches,
+        this.lastHasMore,
+        this.currentRemoteFilter,
+        this.currentBranchFilter,
+      ),
+    });
+  }
+
   private refreshing = false;
   private refreshQueued = false;
   // Scope of a refresh coalesced while another was in flight. 'full' wins over
@@ -1790,15 +1838,16 @@ export class MainPanel {
       // repo-unrelated "demo"-looking graph.
       const remoteFilter = this.isFirstGetLog ? MainPanel.savedRemoteFilter : this.currentRemoteFilter;
       const branchFilter = this.isFirstGetLog ? MainPanel.savedBranchFilter : this.currentBranchFilter;
+      const simplifyGraph = this.isFirstGetLog ? MainPanel.savedSimplifyGraph : this.currentSimplifyGraph;
       const logArgs = { limit: refreshLimit + 1, sortOrder, remoteFilter, branches: branchFilter, includeSignature };
 
       const buildLogData = (allFetched: Awaited<ReturnType<typeof this.gitService.log>>, branches: Awaited<ReturnType<typeof this.gitService.branches>>) => {
         const hasMore = allFetched.length > refreshLimit;
-        const allCommits = hasMore ? allFetched.slice(0, refreshLimit) : allFetched;
-        // Handle empty repository (0 commits) gracefully. The webview renders from
-        // paths/links/dots; the legacy GraphNode[] is unused so we don't build it.
-        const fg = allCommits.length > 0 ? buildFullGraph(allCommits, branches, this.makeBranchColorResolver()) : { paths: [], links: [], dots: [], commitLeftMargin: [] };
-        return { commits: allCommits, hasMore, currentLimit: this.currentLimit, graph: [], paths: fg.paths, links: fg.links, dots: fg.dots, commitLeftMargin: fg.commitLeftMargin, remoteFilter, branches: branchFilter };
+        const rawCommits = hasMore ? allFetched.slice(0, refreshLimit) : allFetched;
+        this.lastRawCommits = rawCommits;
+        this.lastLogBranches = branches;
+        this.lastHasMore = hasMore;
+        return this.buildLogDataFromRaw(rawCommits, branches, hasMore, remoteFilter, branchFilter, simplifyGraph);
       };
 
       if (scope === 'status') {
@@ -1999,6 +2048,7 @@ export class MainPanel {
     this.disposed = true;
     MainPanel.savedRemoteFilter = this.currentRemoteFilter;
     MainPanel.savedBranchFilter = this.currentBranchFilter;
+    MainPanel.savedSimplifyGraph = this.currentSimplifyGraph;
     // Drop any modal request that was queued for this panel but never delivered
     // (panel closed before the webview was ready). A fresh panel opened later
     // for an unrelated reason should not surface a stale modal.

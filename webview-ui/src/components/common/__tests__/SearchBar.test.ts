@@ -175,16 +175,16 @@ describe('SearchBar — filter UI', () => {
   it('source filter button toggles dropdown open/closed', async () => {
     const { container } = render(SearchBar, { ...baseProps, remotes: ['origin'] });
     expect(container.querySelector('.dropdown')).toBeNull();
-    await fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.filter-btn')[0]);
+    await fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.filter-btn')[1]);
     expect(container.querySelector('.dropdown')).not.toBeNull();
-    await fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.filter-btn')[0]);
+    await fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.filter-btn')[1]);
     expect(container.querySelector('.dropdown')).toBeNull();
   });
 
   it('clicking a remote in the source filter calls onFilterChange', async () => {
     const onFilterChange = vi.fn();
     const { container } = render(SearchBar, { ...baseProps, remotes: ['origin', 'upstream'], onFilterChange });
-    await fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.filter-btn')[0]);
+    await fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.filter-btn')[1]);
     const items = container.querySelectorAll<HTMLButtonElement>('.dd-item');
     // items: [All, Local, origin, upstream]
     await fireEvent.click(items[2]);
@@ -199,7 +199,7 @@ describe('SearchBar — filter UI', () => {
       remoteFilter: ['origin'],
       onFilterChange,
     });
-    await fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.filter-btn')[0]);
+    await fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.filter-btn')[1]);
     const items = container.querySelectorAll<HTMLButtonElement>('.dd-item');
     await fireEvent.click(items[0]);
     expect(onFilterChange).toHaveBeenCalledWith([]);
@@ -223,7 +223,7 @@ describe('SearchBar — filter UI', () => {
     const input = container.querySelector<HTMLInputElement>('.search-input')!;
     await fireEvent.input(input, { target: { value: 'foo' } });
     vi.advanceTimersByTime(150);
-    await fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.filter-btn')[1]);
+    await fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.filter-btn')[2]);
     expect(container.querySelector('.dropdown')).not.toBeNull();
     await fireEvent.keyDown(container.querySelector('.search-bar')!, { key: 'Escape' });
     expect(container.querySelector('.dropdown')).toBeNull();
@@ -232,7 +232,7 @@ describe('SearchBar — filter UI', () => {
 
   it('source filter backdrop click closes the dropdown', async () => {
     const { container } = render(SearchBar, { ...baseProps, remotes: ['origin'] });
-    await fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.filter-btn')[0]);
+    await fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.filter-btn')[1]);
     expect(container.querySelector('.dropdown')).not.toBeNull();
     await fireEvent.click(container.querySelector<HTMLDivElement>('.backdrop')!);
     expect(container.querySelector('.dropdown')).toBeNull();
@@ -243,7 +243,7 @@ describe('SearchBar — filter UI', () => {
       ...baseProps,
       branches: [{ name: 'main', current: true, ahead: 0, behind: 0, hash: 'h' }],
     });
-    await fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.filter-btn')[1]);
+    await fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.filter-btn')[2]);
     expect(container.querySelector('.dropdown')).not.toBeNull();
     await fireEvent.click(container.querySelector<HTMLDivElement>('.backdrop')!);
     expect(container.querySelector('.dropdown')).toBeNull();
@@ -255,7 +255,7 @@ describe('SearchBar — filter UI', () => {
     const input = container.querySelector<HTMLInputElement>('.search-input')!;
     await fireEvent.input(input, { target: { value: 'foo' } });
     vi.advanceTimersByTime(150);
-    await fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.filter-btn')[0]);
+    await fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.filter-btn')[1]);
     expect(container.querySelector('.dropdown')).not.toBeNull();
     await fireEvent.keyDown(container.querySelector('.search-bar')!, { key: 'Escape' });
     expect(container.querySelector('.dropdown')).toBeNull();
@@ -290,7 +290,7 @@ describe('SearchBar — branch filter', () => {
 
   it('lists local and remote branches grouped, skipping origin/HEAD', async () => {
     const { container } = render(SearchBar, { ...baseProps, branches, remotes: ['origin'] });
-    await fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.filter-btn')[1]);
+    await fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.filter-btn')[2]);
     const items = Array.from(container.querySelectorAll('.dd-item')).map(el => el.textContent?.trim());
     expect(items.some(t => t?.includes('main'))).toBe(true);
     expect(items.some(t => t?.includes('feature/login'))).toBe(true);
@@ -300,7 +300,7 @@ describe('SearchBar — branch filter', () => {
   it('clicking a branch fires onBranchFilterChange', async () => {
     const onBranchFilterChange = vi.fn();
     const { container } = render(SearchBar, { ...baseProps, branches, onBranchFilterChange });
-    await fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.filter-btn')[1]);
+    await fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.filter-btn')[2]);
     const items = container.querySelectorAll<HTMLButtonElement>('.dd-item');
     const featureItem = Array.from(items).find(i => i.textContent?.includes('feature/login'))!;
     await fireEvent.click(featureItem);
@@ -309,7 +309,7 @@ describe('SearchBar — branch filter', () => {
 
   it('typing in the branch search input narrows the list', async () => {
     const { container } = render(SearchBar, { ...baseProps, branches });
-    await fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.filter-btn')[1]);
+    await fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.filter-btn')[2]);
     const search = container.querySelector<HTMLInputElement>('.branch-search-input')!;
     await fireEvent.input(search, { target: { value: 'feat' } });
     const items = Array.from(container.querySelectorAll('.dd-item')).map(el => el.textContent?.trim());
@@ -325,10 +325,21 @@ describe('SearchBar — branch filter', () => {
       branchFilter: ['main'],
       onBranchFilterChange,
     });
-    await fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.filter-btn')[1]);
+    await fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.filter-btn')[2]);
     const items = container.querySelectorAll<HTMLButtonElement>('.dd-item');
     await fireEvent.click(items[0]);
     expect(onBranchFilterChange).toHaveBeenCalledWith([]);
+  });
+});
+
+describe('SearchBar — simplify graph toggle', () => {
+  it('toggles simplify mode via onSimplifyGraphChange', async () => {
+    const onSimplifyGraphChange = vi.fn();
+    const { container } = render(SearchBar, { ...baseProps, onSimplifyGraphChange });
+    const btn = container.querySelector<HTMLButtonElement>('.simplify-btn')!;
+    expect(btn.classList.contains('active')).toBe(false);
+    await fireEvent.click(btn);
+    expect(onSimplifyGraphChange).toHaveBeenCalledWith(true);
   });
 });
 

@@ -292,6 +292,8 @@ export const en: Record<string, string> = {
   'search.sourceFilterTooltip': 'Filter by source (local / remote)',
   'search.branchFilter': 'Branch',
   'search.branchFilterTooltip': 'Filter by specific branch',
+  'search.simplifyGraph': 'Simplify',
+  'search.simplifyGraphTooltip': 'Hide intermediate commits and show only branch-relevant commits',
   'search.allBranches': 'All',
   'search.filterBranches': 'Search',
 

@@ -60,6 +60,7 @@ import AmendModal from './components/modals/AmendModal.svelte';
   let headJumpNonce = $state(0);
   let remoteFilter = $state<string[]>([]);
   let branchFilter = $state<string[]>([]);
+  let simplifyGraph = $state(false);
   let resizing = $state(false);
   let conflict = $state<{ operation: string; files: Array<{ path: string; resolved: boolean }> } | null>(null);
   let rebasePaused = $state(false);
@@ -91,6 +92,7 @@ import AmendModal from './components/modals/AmendModal.svelte';
         case 'logData':
           if (msg.payload.remoteFilter !== undefined) remoteFilter = msg.payload.remoteFilter;
           if (msg.payload.branches !== undefined) branchFilter = msg.payload.branches;
+          if (msg.payload.simplifyGraph !== undefined) simplifyGraph = msg.payload.simplifyGraph;
           commitStore.setData(msg.payload);
           break;
         case 'branchData':
@@ -99,6 +101,7 @@ import AmendModal from './components/modals/AmendModal.svelte';
         case 'fullRefresh':
           remoteFilter = msg.payload.logData.remoteFilter ?? [];
           branchFilter = msg.payload.logData.branches ?? [];
+          simplifyGraph = msg.payload.logData.simplifyGraph ?? false;
           branchStore.setData(msg.payload.branchData);
           commitStore.setData(msg.payload.logData);
           break;
@@ -262,6 +265,7 @@ import AmendModal from './components/modals/AmendModal.svelte';
         limit: commitStore.currentLimit || undefined,
         branches: branchFilter.length > 0 ? [...branchFilter] : undefined,
         remoteFilter: remoteFilter.length > 0 ? [...remoteFilter] : undefined,
+        simplifyGraph,
       }});
       vscode.postMessage({ type: 'getBranches' });
     }
@@ -317,6 +321,7 @@ import AmendModal from './components/modals/AmendModal.svelte';
         limit: commitStore.currentLimit || undefined,
         branches: branchFilter.length > 0 ? [...branchFilter] : undefined,
         remoteFilter: filter.length > 0 ? [...filter] : undefined,
+        simplifyGraph,
       },
     });
   }
@@ -330,8 +335,15 @@ import AmendModal from './components/modals/AmendModal.svelte';
         limit: commitStore.currentLimit || undefined,
         branches: branches.length > 0 ? [...branches] : undefined,
         remoteFilter: remoteFilter.length > 0 ? [...remoteFilter] : undefined,
+        simplifyGraph,
       },
     });
+  }
+
+  function handleSimplifyGraphChange(enabled: boolean) {
+    simplifyGraph = enabled;
+    commitStore.setLoading(true);
+    vscode.postMessage({ type: 'setSimplifyGraph', payload: { enabled } });
   }
 
   // Draggable resize handle - track active listeners for cleanup
@@ -370,6 +382,7 @@ import AmendModal from './components/modals/AmendModal.svelte';
       limit: commitStore.currentLimit || undefined,
       branches: branchFilter.length > 0 ? [...branchFilter] : undefined,
       remoteFilter: remoteFilter.length > 0 ? [...remoteFilter] : undefined,
+      simplifyGraph,
     }});
     vscode.postMessage({ type: 'getBranches' });
     vscode.postMessage({ type: 'getRepoList' });
@@ -472,6 +485,8 @@ import AmendModal from './components/modals/AmendModal.svelte';
           onBranchFilterChange={handleBranchFilterChange}
           {headOffscreen}
           onJumpToHead={handleJumpToHead}
+          {simplifyGraph}
+          onSimplifyGraphChange={handleSimplifyGraphChange}
         />
       {/if}
       {#if bisectMessage}

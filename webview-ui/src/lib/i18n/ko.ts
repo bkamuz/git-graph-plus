@@ -292,6 +292,8 @@ export const ko: Record<string, string> = {
   'search.sourceFilterTooltip': '소스로 필터 (로컬 / 원격)',
   'search.branchFilter': 'Branch',
   'search.branchFilterTooltip': '특정 브랜치로 필터',
+  'search.simplifyGraph': 'Simplify',
+  'search.simplifyGraphTooltip': '중간 commit을 숨기고 branch 관련 commit만 표시',
   'search.allBranches': 'All',
   'search.filterBranches': 'Search',
 
