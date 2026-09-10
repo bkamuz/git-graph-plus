@@ -82,6 +82,7 @@ export interface CommitGraphData {
   currentLimit?: number;
   remoteFilter?: string[];
   branches?: string[];
+  simplifyGraph?: boolean;
 }
 
 export interface BranchInfo {

@@ -409,6 +409,63 @@ describe('MainPanel orchestration logic', () => {
     expect(logs.some(l => (l.payload!.commits as Array<{ hash: string }>).some(c => c.hash === 'aaaaaaa1'))).toBe(false);
   });
 
+  it('setSimplifyGraph invalidates an in-flight getLog so it cannot revert simplify', async () => {
+    H.git.log.mockResolvedValue([commit('aaaaaaa1'), commit('bbbbbbb2')]);
+    await dispatch({ type: 'getLog', payload: {} });
+
+    let resolveLate!: (v: unknown) => void;
+    H.git.log.mockImplementationOnce(() => new Promise(r => { resolveLate = r as (v: unknown) => void; }));
+
+    const pLate = dispatch({ type: 'getLog', payload: { simplifyGraph: false } });
+    await dispatch({ type: 'setSimplifyGraph', payload: { enabled: true } });
+
+    const afterToggle = postedOfType('logData').at(-1)!;
+    expect(afterToggle.payload!.simplifyGraph).toBe(true);
+
+    resolveLate([commit('aaaaaaa1'), commit('bbbbbbb2')]);
+    await pLate;
+
+    const last = postedOfType('logData').at(-1)!;
+    expect(last.payload!.simplifyGraph).toBe(true);
+  });
+
+  it('refreshAll posts the live simplify flag after a mid-flight toggle on', async () => {
+    H.git.log.mockResolvedValue([commit('aaaaaaa1')]);
+    await dispatch({ type: 'getLog', payload: {} });
+
+    let resolveLate!: (v: unknown) => void;
+    H.git.log.mockImplementationOnce(() => new Promise(r => { resolveLate = r as (v: unknown) => void; }));
+
+    const pRefresh = (MainPanel.currentPanel as unknown as { refreshAll(): Promise<void> }).refreshAll();
+    await dispatch({ type: 'setSimplifyGraph', payload: { enabled: true } });
+
+    resolveLate([commit('aaaaaaa1')]);
+    await pRefresh;
+
+    const refresh = postedOfType('fullRefresh').at(-1)!;
+    const logData = (refresh.payload as { logData: { simplifyGraph?: boolean } }).logData;
+    expect(logData.simplifyGraph).toBe(true);
+  });
+
+  it('refreshAll posts the live simplify flag after a mid-flight toggle off', async () => {
+    H.git.log.mockResolvedValue([commit('aaaaaaa1')]);
+    await dispatch({ type: 'getLog', payload: {} });
+    await dispatch({ type: 'setSimplifyGraph', payload: { enabled: true } });
+
+    let resolveLate!: (v: unknown) => void;
+    H.git.log.mockImplementationOnce(() => new Promise(r => { resolveLate = r as (v: unknown) => void; }));
+
+    const pRefresh = (MainPanel.currentPanel as unknown as { refreshAll(): Promise<void> }).refreshAll();
+    await dispatch({ type: 'setSimplifyGraph', payload: { enabled: false } });
+
+    resolveLate([commit('aaaaaaa1')]);
+    await pRefresh;
+
+    const refresh = postedOfType('fullRefresh').at(-1)!;
+    const logData = (refresh.payload as { logData: { simplifyGraph?: boolean } }).logData;
+    expect(logData.simplifyGraph).toBe(false);
+  });
+
   it('refreshAll applies the saved filter before the first getLog so it does not flash the full unfiltered graph', async () => {
     const M = MainPanel as unknown as { savedRemoteFilter?: string[]; savedBranchFilter?: string[] };
     const prevRemote = M.savedRemoteFilter;

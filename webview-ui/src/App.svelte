@@ -60,6 +60,10 @@ import AmendModal from './components/modals/AmendModal.svelte';
   let headJumpNonce = $state(0);
   let remoteFilter = $state<string[]>([]);
   let branchFilter = $state<string[]>([]);
+  let simplifyGraph = $state(false);
+  // After the user toggles, the webview owns simplify state; host payloads only
+  // seed the initial value before the first user interaction.
+  let simplifyUserTouched = $state(false);
   let resizing = $state(false);
   let conflict = $state<{ operation: string; files: Array<{ path: string; resolved: boolean }> } | null>(null);
   let rebasePaused = $state(false);
@@ -82,6 +86,11 @@ import AmendModal from './components/modals/AmendModal.svelte';
     document.documentElement.style.setProperty('--badge-bar-width', `${uiStore.badgeBarWidth}px`);
   });
 
+  function applySimplifyFromHost(value: boolean | undefined) {
+    if (value === undefined || simplifyUserTouched) return;
+    simplifyGraph = value;
+  }
+
   onMount(() => {
     uiStore.bottomPanelHeight = Math.round(window.innerHeight * BOTTOM_PANEL_DEFAULT_RATIO);
 
@@ -91,6 +100,7 @@ import AmendModal from './components/modals/AmendModal.svelte';
         case 'logData':
           if (msg.payload.remoteFilter !== undefined) remoteFilter = msg.payload.remoteFilter;
           if (msg.payload.branches !== undefined) branchFilter = msg.payload.branches;
+          applySimplifyFromHost(msg.payload.simplifyGraph);
           commitStore.setData(msg.payload);
           break;
         case 'branchData':
@@ -99,6 +109,7 @@ import AmendModal from './components/modals/AmendModal.svelte';
         case 'fullRefresh':
           remoteFilter = msg.payload.logData.remoteFilter ?? [];
           branchFilter = msg.payload.logData.branches ?? [];
+          applySimplifyFromHost(msg.payload.logData.simplifyGraph);
           branchStore.setData(msg.payload.branchData);
           commitStore.setData(msg.payload.logData);
           break;
@@ -334,6 +345,13 @@ import AmendModal from './components/modals/AmendModal.svelte';
     });
   }
 
+  function handleSimplifyGraphChange(enabled: boolean) {
+    simplifyUserTouched = true;
+    simplifyGraph = enabled;
+    commitStore.setLoading(true);
+    vscode.postMessage({ type: 'setSimplifyGraph', payload: { enabled } });
+  }
+
   // Draggable resize handle - track active listeners for cleanup
   let resizeCleanup: (() => void) | null = null;
 
@@ -472,6 +490,8 @@ import AmendModal from './components/modals/AmendModal.svelte';
           onBranchFilterChange={handleBranchFilterChange}
           {headOffscreen}
           onJumpToHead={handleJumpToHead}
+          {simplifyGraph}
+          onSimplifyGraphChange={handleSimplifyGraphChange}
         />
       {/if}
       {#if bisectMessage}
