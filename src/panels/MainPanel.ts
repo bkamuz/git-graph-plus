@@ -55,6 +55,7 @@ export class MainPanel {
   private lastHasMore = false;
   private isFirstGetLog = true;
   private logSequence = 0;
+  private refreshGeneration = 0;
   private searchSequence = 0;
   // Two independent guards: selecting a commit (loads its file list) and
   // selecting a file (loads that file's diff) are different axes, so a file
@@ -457,6 +458,7 @@ export class MainPanel {
         case 'setSimplifyGraph': {
           this.currentSimplifyGraph = message.payload.enabled;
           ++this.logSequence;
+          ++this.refreshGeneration;
           this.postCachedLogData();
           break;
         }
@@ -1846,6 +1848,7 @@ export class MainPanel {
       // repo-unrelated "demo"-looking graph.
       const remoteFilter = this.isFirstGetLog ? MainPanel.savedRemoteFilter : this.currentRemoteFilter;
       const branchFilter = this.isFirstGetLog ? MainPanel.savedBranchFilter : this.currentBranchFilter;
+      const refreshGenAtStart = this.refreshGeneration;
       const logArgs = { limit: refreshLimit + 1, sortOrder, remoteFilter, branches: branchFilter, includeSignature };
 
       const buildLogData = (allFetched: Awaited<ReturnType<typeof this.gitService.log>>, branches: Awaited<ReturnType<typeof this.gitService.branches>>) => {
@@ -1854,7 +1857,11 @@ export class MainPanel {
         this.lastRawCommits = rawCommits;
         this.lastLogBranches = branches;
         this.lastHasMore = hasMore;
-        const simplifyGraph = this.isFirstGetLog ? MainPanel.savedSimplifyGraph : this.currentSimplifyGraph;
+        // Read simplify at post time. When refreshGenAtStart !== refreshGeneration
+        // the user toggled mid-flight — still post raw data, live flag wins.
+        const simplifyGraph = this.isFirstGetLog && refreshGenAtStart === this.refreshGeneration
+          ? MainPanel.savedSimplifyGraph
+          : this.currentSimplifyGraph;
         return this.buildLogDataFromRaw(rawCommits, branches, hasMore, remoteFilter, branchFilter, simplifyGraph);
       };
 
