@@ -423,13 +423,12 @@ export class MainPanel {
           const effectiveBranchFilter = this.isFirstGetLog && message.payload.branches === undefined
             ? MainPanel.savedBranchFilter
             : message.payload.branches;
-          const effectiveSimplifyGraph = this.isFirstGetLog && message.payload.simplifyGraph === undefined
-            ? MainPanel.savedSimplifyGraph
-            : message.payload.simplifyGraph ?? this.currentSimplifyGraph;
+          if (this.isFirstGetLog) {
+            this.currentSimplifyGraph = message.payload.simplifyGraph ?? MainPanel.savedSimplifyGraph;
+          }
           this.isFirstGetLog = false;
           this.currentRemoteFilter = effectiveFilter;
           this.currentBranchFilter = effectiveBranchFilter;
-          this.currentSimplifyGraph = effectiveSimplifyGraph;
           const logPayload = { ...message.payload, remoteFilter: effectiveFilter, branches: effectiveBranchFilter, limit: requestedLimit + 1, sortOrder, includeSignature };
           const seq = ++this.logSequence;
           const [allFetched, logBranches] = await Promise.all([
@@ -444,12 +443,20 @@ export class MainPanel {
           this.lastHasMore = hasMore;
           this.post({
             type: 'logData',
-            payload: this.buildLogDataFromRaw(rawCommits, logBranches, hasMore, effectiveFilter, effectiveBranchFilter),
+            payload: this.buildLogDataFromRaw(
+              rawCommits,
+              logBranches,
+              hasMore,
+              effectiveFilter,
+              effectiveBranchFilter,
+              this.currentSimplifyGraph,
+            ),
           });
           break;
         }
         case 'setSimplifyGraph': {
           this.currentSimplifyGraph = message.payload.enabled;
+          ++this.logSequence;
           this.postCachedLogData();
           break;
         }
@@ -1796,6 +1803,7 @@ export class MainPanel {
         this.lastHasMore,
         this.currentRemoteFilter,
         this.currentBranchFilter,
+        this.currentSimplifyGraph,
       ),
     });
   }
@@ -1838,7 +1846,6 @@ export class MainPanel {
       // repo-unrelated "demo"-looking graph.
       const remoteFilter = this.isFirstGetLog ? MainPanel.savedRemoteFilter : this.currentRemoteFilter;
       const branchFilter = this.isFirstGetLog ? MainPanel.savedBranchFilter : this.currentBranchFilter;
-      const simplifyGraph = this.isFirstGetLog ? MainPanel.savedSimplifyGraph : this.currentSimplifyGraph;
       const logArgs = { limit: refreshLimit + 1, sortOrder, remoteFilter, branches: branchFilter, includeSignature };
 
       const buildLogData = (allFetched: Awaited<ReturnType<typeof this.gitService.log>>, branches: Awaited<ReturnType<typeof this.gitService.branches>>) => {
@@ -1847,6 +1854,7 @@ export class MainPanel {
         this.lastRawCommits = rawCommits;
         this.lastLogBranches = branches;
         this.lastHasMore = hasMore;
+        const simplifyGraph = this.isFirstGetLog ? MainPanel.savedSimplifyGraph : this.currentSimplifyGraph;
         return this.buildLogDataFromRaw(rawCommits, branches, hasMore, remoteFilter, branchFilter, simplifyGraph);
       };
 

@@ -265,7 +265,6 @@ import AmendModal from './components/modals/AmendModal.svelte';
         limit: commitStore.currentLimit || undefined,
         branches: branchFilter.length > 0 ? [...branchFilter] : undefined,
         remoteFilter: remoteFilter.length > 0 ? [...remoteFilter] : undefined,
-        simplifyGraph,
       }});
       vscode.postMessage({ type: 'getBranches' });
     }
@@ -321,7 +320,6 @@ import AmendModal from './components/modals/AmendModal.svelte';
         limit: commitStore.currentLimit || undefined,
         branches: branchFilter.length > 0 ? [...branchFilter] : undefined,
         remoteFilter: filter.length > 0 ? [...filter] : undefined,
-        simplifyGraph,
       },
     });
   }
@@ -335,7 +333,6 @@ import AmendModal from './components/modals/AmendModal.svelte';
         limit: commitStore.currentLimit || undefined,
         branches: branches.length > 0 ? [...branches] : undefined,
         remoteFilter: remoteFilter.length > 0 ? [...remoteFilter] : undefined,
-        simplifyGraph,
       },
     });
   }
@@ -382,7 +379,6 @@ import AmendModal from './components/modals/AmendModal.svelte';
       limit: commitStore.currentLimit || undefined,
       branches: branchFilter.length > 0 ? [...branchFilter] : undefined,
       remoteFilter: remoteFilter.length > 0 ? [...remoteFilter] : undefined,
-      simplifyGraph,
     }});
     vscode.postMessage({ type: 'getBranches' });
     vscode.postMessage({ type: 'getRepoList' });
