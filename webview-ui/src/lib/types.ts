@@ -81,6 +81,7 @@ export interface CommitGraphData {
   commitLeftMargin?: number[];
   hasMore?: boolean;
   currentLimit?: number;
+  simplifyGraph?: boolean;
 }
 
 export interface BranchInfo {

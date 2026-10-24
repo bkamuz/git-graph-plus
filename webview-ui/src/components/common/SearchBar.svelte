@@ -16,6 +16,8 @@
     onBranchFilterChange?: (filter: string[]) => void;
     headOffscreen?: boolean;
     onJumpToHead?: () => void;
+    simplifyGraph?: boolean;
+    onSimplifyGraphChange?: (enabled: boolean) => void;
   }
 
   let {
@@ -29,6 +31,8 @@
     onBranchFilterChange = () => {},
     headOffscreen = false,
     onJumpToHead = () => {},
+    simplifyGraph = false,
+    onSimplifyGraphChange = () => {},
   }: Props = $props();
 
   let query = $state('');
@@ -250,6 +254,18 @@
     use:tooltip={t('search.jumpToHead')}
   >
     <i class="codicon codicon-location"></i>
+  </button>
+
+  <button
+    class="filter-btn simplify-btn"
+    class:active={simplifyGraph}
+    onclick={() => onSimplifyGraphChange(!simplifyGraph)}
+    aria-label={t('search.simplifyGraph')}
+    aria-pressed={simplifyGraph}
+    use:tooltip={t('search.simplifyGraphTooltip')}
+  >
+    <i class="codicon codicon-type-hierarchy filter-btn-icon"></i>
+    <span class="filter-label">{t('search.simplifyGraph')}</span>
   </button>
 
   <div class="filter-wrap">
@@ -564,6 +580,10 @@
   .filter-btn.active {
     color: var(--vscode-focusBorder, #007fd4);
     border-color: var(--vscode-focusBorder, #007fd4);
+  }
+
+  .simplify-btn {
+    max-width: none;
   }
 
   .chevron { font-size: 12px; opacity: 0.7; flex-shrink: 0; }

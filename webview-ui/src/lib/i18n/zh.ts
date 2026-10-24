@@ -292,6 +292,8 @@ export const zh: Record<string, string> = {
   'search.sourceFilterTooltip': '按来源筛选（本地 / 远程）',
   'search.branchFilter': 'Branch',
   'search.branchFilterTooltip': '按特定分支筛选',
+  'search.simplifyGraph': 'Simplify',
+  'search.simplifyGraphTooltip': '隐藏中间提交，仅显示与分支相关的提交',
   'search.allBranches': 'All',
   'search.filterBranches': 'Search',
 

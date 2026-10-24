@@ -451,6 +451,28 @@ describe('App — view mode rendering', () => {
   });
 });
 
+describe('App — simplify graph toggle ownership', () => {
+  it('restores simplify from host before user interaction, then ignores stale host values', async () => {
+    const { container } = render(App);
+
+    postMsg('logData', { commits: [], graph: [], hasMore: false, currentLimit: 100, simplifyGraph: true });
+    await waitFor(() => container.querySelector('.simplify-btn.active'));
+
+    await fireEvent.click(container.querySelector<HTMLButtonElement>('.simplify-btn')!);
+    await waitFor(() => !container.querySelector('.simplify-btn.active'));
+
+    postMsg('fullRefresh', {
+      logData: { commits: [], graph: [], hasMore: false, currentLimit: 100, simplifyGraph: true },
+      branchData: {
+        branches: [{ name: 'main', current: true, ahead: 0, behind: 0, hash: 'h' }],
+        tags: [], remotes: [], stashes: [], worktrees: [],
+      },
+    });
+    await waitFor(() => expect(commitStore.currentLimit).toBe(100));
+    expect(container.querySelector('.simplify-btn.active')).toBeNull();
+  });
+});
+
 describe('App — fullRefresh and tagDetails', () => {
   it('fullRefresh seeds both branch and log stores in one shot', async () => {
     render(App);
@@ -1356,10 +1378,10 @@ describe('App — filter change handlers', () => {
       ],
       tags: [], remotes: [], stashes: [], worktrees: [],
     });
-    // Branch filter is the second .filter-btn in the SearchBar.
-    await waitFor(() => container.querySelectorAll('.filter-btn').length >= 2);
+    // Branch filter is the third .filter-btn in the SearchBar (after Simplify + Source).
+    await waitFor(() => container.querySelectorAll('.filter-btn').length >= 3);
     globalThis.__postedMessages = [];
-    await fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.filter-btn')[1]);
+    await fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.filter-btn')[2]);
     const item = Array.from(container.querySelectorAll<HTMLButtonElement>('.dd-item'))
       .find(el => el.textContent?.includes('feature'))!;
     await fireEvent.click(item);
@@ -1375,9 +1397,9 @@ describe('App — filter change handlers', () => {
       remotes: [{ name: 'origin', fetchUrl: '', pushUrl: '' }],
       stashes: [], worktrees: [],
     });
-    await waitFor(() => container.querySelectorAll('.filter-btn').length >= 1);
+    await waitFor(() => container.querySelectorAll('.filter-btn').length >= 2);
     globalThis.__postedMessages = [];
-    await fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.filter-btn')[0]);
+    await fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.filter-btn')[1]);
     const item = Array.from(container.querySelectorAll<HTMLButtonElement>('.dd-item'))
       .find(el => el.textContent?.includes('origin'))!;
     await fireEvent.click(item);
@@ -1393,16 +1415,16 @@ describe('App — filter change handlers', () => {
       remotes: [{ name: 'origin', fetchUrl: '', pushUrl: '' }],
       stashes: [], worktrees: [],
     });
-    await waitFor(() => container.querySelectorAll('.filter-btn').length >= 2);
+    await waitFor(() => container.querySelectorAll('.filter-btn').length >= 3);
     // 1) Select the local branch "feature" → branchFilter = ['feature'].
-    await fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.filter-btn')[1]);
+    await fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.filter-btn')[2]);
     const branchItem = Array.from(container.querySelectorAll<HTMLButtonElement>('.dd-item'))
       .find(el => el.textContent?.includes('feature'))!;
     await fireEvent.click(branchItem);
     // 2) Apply a remote-only source filter (no 'local'). The local "feature"
     //    branch no longer matches, so the cross-filter must drop it.
     globalThis.__postedMessages = [];
-    await fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.filter-btn')[0]);
+    await fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.filter-btn')[1]);
     const remoteItem = Array.from(container.querySelectorAll<HTMLButtonElement>('.dd-item'))
       .find(el => el.textContent?.includes('origin'))!;
     await fireEvent.click(remoteItem);
